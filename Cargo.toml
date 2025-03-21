@@ -2,20 +2,60 @@
 edition = "2024"
 name = "xplot-firmware"
 version = "0.1.0"
-license = "MIT OR Apache-2.0"
+license = "MIT"
+
 
 [dependencies]
-cortex-m = "0.7"
-cortex-m-rt = "0.7"
-embedded-hal = { version = "1.0.0" }
+cortex-m = { version = "*", features = ["inline-asm"] }
+cortex-m-rt = "*"
+defmt = "*"
+defmt-rtt = "*"
+panic-probe = { version = "*", features = ["print-defmt"] }
+embassy-embedded-hal = { version = "*", features = ["defmt"] }
+embassy-executor = { version = "*", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "task-arena-size-32768"] }
+embassy-futures = { version = "*" }
+embassy-sync = { version = "*", features = ["defmt"] }
+embassy-time = { version = "*", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-rp = { version = "*", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
+pio-proc = "*"
+pio = "*"
+embassy-usb-driver = { version = "*", features = ["defmt"] }
+embassy-usb-logger = { version = "*" }
+portable-atomic = { version = "*", features = ["critical-section"] }
+log = "*"
+embassy-net = { version = "*", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet", "dns", "proto-ipv4", "proto-ipv6", "multicast"] }
 
-defmt = "0.3"
-defmt-rtt = "0.4"
-panic-probe = { version = "0.3", features = ["print-defmt"] }
 
-# We're using a Pico by default on this template
-rp-pico = "0.9"
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 1
+overflow-checks = true
+lto = "off"
 
-# If you're not going to use a Board Support Package you'll need these:
-# rp2040-hal = { version="0.10", features=["rt", "critical-section-impl"] }
-# rp2040-boot2 = "0.3"
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
+
+[profile.test]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 's'
+overflow-checks = true
+
+[profile.bench]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'

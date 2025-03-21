@@ -7,7 +7,6 @@ MEMORY {
 EXTERN(BOOT2_FIRMWARE)
 
 SECTIONS {
-    /* ### Boot loader */
     .boot2 ORIGIN(BOOT2) :
     {
         KEEP(*(.boot2));

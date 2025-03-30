@@ -1,6 +1,3 @@
-#![no_std]
-#![no_main]
-
 use defmt::{info, panic, unwrap};
 use embassy_executor::Spawner;
 use embassy_rp::bind_interrupts;

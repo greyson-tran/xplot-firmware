@@ -1,13 +1,16 @@
 #![no_std]
 #![no_main]
 
+mod motor;
+mod usb;
+
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio;
 use gpio::{Level, Output};
 use {defmt_rtt as _, panic_probe as _};
 
-use xplot_firmware::motor::Servo;
+use motor::Servo;
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {

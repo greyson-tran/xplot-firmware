@@ -23,8 +23,8 @@ embassy-usb-driver = { version = "*", features = ["defmt"] }
 embassy-usb-logger = { version = "*" }
 portable-atomic = { version = "*", features = ["critical-section"] }
 log = "*"
-embassy-net = { version = "*", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet", "dns", "proto-ipv4", "proto-ipv6", "multicast"] }
-
+embassy-usb = "*"
+static_cell = "*"
 
 [profile.dev]
 codegen-units = 1

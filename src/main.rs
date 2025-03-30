@@ -4,23 +4,41 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio;
-use embassy_time::{Duration, Timer};
 use gpio::{Level, Output};
 use {defmt_rtt as _, panic_probe as _};
 
+use xplot_firmware::motor::Servo;
+
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(_spawner: Spawner) -> ! {
     info!("Program start");
-    let p = embassy_rp::init(Default::default());
-    let mut led = Output::new(p.PIN_25, Level::Low);
+    let pac = embassy_rp::init(Default::default());
 
+    // Await the Future returned by Servo::new
+    let mut left_servo = Servo::new(
+        Output::new(pac.PIN_10, Level::Low),
+        Output::new(pac.PIN_11, Level::Low),
+        7,
+    )
+    .await;
+
+    let mut right_servo = Servo::new(
+        Output::new(pac.PIN_12, Level::Low),
+        Output::new(pac.PIN_13, Level::Low),
+        173,
+    )
+    .await;
+
+    // Await the async go_to_angle method
     loop {
-        info!("led on!");
-        led.set_high();
-        Timer::after(Duration::from_secs(1)).await;
+        for angle in 7..60 {
+            right_servo.go_to_angle(180 - angle).await;
+            left_servo.go_to_angle(angle).await;
+        }
 
-        info!("led off!");
-        led.set_low();
-        Timer::after(Duration::from_secs(1)).await;
+        for angle in (7..60).rev() {
+            right_servo.go_to_angle(180 - angle).await;
+            left_servo.go_to_angle(angle).await;
+        }
     }
 }

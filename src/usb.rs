@@ -1,11 +1,17 @@
 use defmt::{info, panic, unwrap};
 use embassy_executor::Spawner;
+
 use embassy_rp::bind_interrupts;
 use embassy_rp::peripherals::USB;
 use embassy_rp::usb::{Driver, InterruptHandler};
+
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::channel::*;
+
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::driver::EndpointError;
 use embassy_usb::{Builder, Config, UsbDevice};
+
 use static_cell::StaticCell;
 
 #[derive(Debug)]
@@ -20,17 +26,24 @@ impl From<EndpointError> for Disconnected {
     }
 }
 
+pub static USBINCHANNEL: Channel<CriticalSectionRawMutex, [u8; 8], 1> = Channel::new();
+pub static USBOUTCHANNEL: Channel<CriticalSectionRawMutex, [u8; 8], 1> = Channel::new();
+
 pub struct Serial {
     class: CdcAcmClass<'static, Driver<'static, USB>>,
     usb: Option<UsbDevice<'static, Driver<'static, USB>>>,
+    sender: Sender<'static, CriticalSectionRawMutex, [u8; 8], 1>,
+    receiver: Receiver<'static, CriticalSectionRawMutex, [u8; 8], 1>,
 }
 
 impl Serial {
     pub async fn new(usb: USB) -> Self {
         info!("Started creating new logical object: Serial Interface");
+
         bind_interrupts!(struct Irqs {
             USBCTRL_IRQ => InterruptHandler<USB>;
         });
+
         let driver = Driver::new(usb, Irqs);
 
         let config = {
@@ -67,19 +80,20 @@ impl Serial {
 
         Self {
             class,
-            usb: Some(usb), // Wrap usb in Some
+            usb: Some(usb),
+            sender: USBINCHANNEL.sender(),
+            receiver: USBOUTCHANNEL.receiver(),
         }
     }
 
-    pub async fn start_server(&mut self, spawner: Spawner) -> ! {
-        // Take ownership of usb, replacing it with None
+    pub async fn server(&mut self, spawner: Spawner) -> ! {
         let usb = self.usb.take().unwrap();
         unwrap!(spawner.spawn(usb_task(usb)));
 
         loop {
             self.class.wait_connection().await;
             info!("Serial interface has been connected.");
-            let _ = echo(&mut self.class).await;
+            let _ = handler(&mut self.class, &mut self.sender, &mut self.receiver).await;
             info!("Serial interface has been disconnected.")
         }
     }
@@ -90,12 +104,30 @@ async fn usb_task(mut device: UsbDevice<'static, Driver<'static, USB>>) -> ! {
     device.run().await
 }
 
-async fn echo(class: &mut CdcAcmClass<'static, Driver<'static, USB>>) -> Result<(), Disconnected> {
+async fn handler(
+    class: &mut CdcAcmClass<'static, Driver<'static, USB>>,
+    sender: &mut Sender<'static, CriticalSectionRawMutex, [u8; 8], 1>,
+    receiver: &mut Receiver<'static, CriticalSectionRawMutex, [u8; 8], 1>,
+) -> Result<(), Disconnected> {
     let mut buf = [0; 64];
+
     loop {
-        let n = class.read_packet(&mut buf).await?;
-        let data = &buf[..n];
-        info!("data: {:x}", data[0] as char);
-        class.write_packet(data).await?;
+        let _ = class.read_packet(&mut buf).await?;
+
+        let message: [u8; 8] = {
+            let mut message = [0u8; 8];
+            message[..8].copy_from_slice(&buf[..8]);
+            message
+        };
+
+        // ECHO TO DEBUG
+        info!("{:#?}", &message);
+
+        sender.send(message).await;
+
+        let _ = match receiver.try_receive() {
+            Ok(message) => class.write_packet(&message).await,
+            Err(_) => continue,
+        };
     }
 }
